@@ -1,5 +1,13 @@
 import React, { useState, useCallback } from 'react';
 import { supabase, STORAGE_BUCKET } from '../config/supabase';
+import { 
+  XMarkIcon, 
+  CheckIcon, 
+  ArrowUpTrayIcon,
+  EnvelopeIcon,
+  CalendarIcon,
+  ChatBubbleBottomCenterTextIcon
+} from '@heroicons/react/24/outline';
 
 interface FileUploadState {
   file: File | null;
@@ -26,17 +34,39 @@ const FileUpload = () => {
     preview: null
   });
 
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const formatSize = (bytes: number): string => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  };
 
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    handleFileSelection(file || null);
+    const droppedFile = e.dataTransfer.files?.[0];
+    if (droppedFile) {
+      setState(prev => ({
+        ...prev,
+        file: droppedFile,
+        error: null
+      }));
+    }
+    setIsDragging(false);
   }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
-    handleFileSelection(selectedFile || null);
+    if (selectedFile) {
+      setState(prev => ({
+        ...prev,
+        file: selectedFile,
+        error: null
+      }));
+    }
   };
 
   const handleFileSelection = (file: File | null) => {
@@ -243,168 +273,225 @@ const FileUpload = () => {
   const canSubmit = state.file || state.message.trim();
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <h2 className="text-2xl font-bold mb-6">Share File or Message</h2>
+    <div className="p-6 bg-white rounded-lg shadow-lg max-w-2xl mx-auto">
+      <div className="flex justify-between items-center mb-4">
+        <h2 className="text-xl font-semibold">Upload and attach files</h2>
+        <button onClick={handleCancel} className="text-gray-500">
+          <XMarkIcon className="w-6 h-6" />
+        </button>
+      </div>
+
       <form onSubmit={handleSubmit} className="space-y-6">
         <div className="space-y-4">
           <div className="relative">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              File Upload (Optional if message is provided)
-            </label>
             <div 
-              className={`border-2 border-dashed rounded-lg p-6 text-center ${
-                state.file ? 'border-green-500 bg-green-50' : 'border-gray-300 hover:border-gray-400'
+              className={`border-2 border-dashed rounded-lg p-8 text-center mb-4 ${
+                state.file ? 'border-blue-500 bg-blue-50' : 'border-gray-300'
               }`}
               onDrop={handleDrop}
               onDragOver={(e) => e.preventDefault()}
             >
+              <ArrowUpTrayIcon className="w-12 h-12 mx-auto mb-4 text-gray-400" />
               <input
                 type="file"
                 onChange={handleFileChange}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                 ref={fileInputRef}
               />
-              {state.file ? (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-center space-x-3">
-                    <span className="text-green-600 flex items-center">
-                      <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      {state.file.name}
-                    </span>
-                    <div className="flex space-x-2">
-                      <button
-                        type="button"
-                        onClick={clearFileSelection}
-                        className="text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 focus:outline-none transition-colors"
-                      >
-                        Change
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleCancel}
-                        className="text-sm px-3 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200 focus:outline-none transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </div>
-                  {state.preview && (
-                    <div className="mt-4 relative">
-                      <img
-                        src={state.preview}
-                        alt="Preview"
-                        className="max-w-xs mx-auto rounded shadow-sm"
-                      />
-                      <button
-                        type="button"
-                        onClick={clearFileSelection}
-                        className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 focus:outline-none"
-                        title="Remove preview"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  )}
-                  {state.fileContent && (
-                    <div className="mt-4">
-                      <p className="text-sm text-gray-600 mb-2">File Preview:</p>
-                      <div className="bg-gray-50 rounded-md p-4 text-left">
-                        <pre className="text-xs text-gray-700 whitespace-pre-wrap max-h-40 overflow-auto">
-                          {state.fileContent}
-                        </pre>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <svg className="mx-auto h-12 w-12 text-gray-400" stroke="currentColor" fill="none" viewBox="0 0 48 48">
-                    <path d="M28 8H12a4 4 0 00-4 4v20m32-12v8m0 0v8a4 4 0 01-4 4H12a4 4 0 01-4-4v-4m32-4l-3.172-3.172a4 4 0 00-5.656 0L28 28M8 32l9.172-9.172a4 4 0 015.656 0L28 28m0 0l4 4m4-24h8m-4-4v8m-12 4h.02" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  <p className="mt-4 text-gray-600">
-                    Drag and drop a file here, or click to select a file
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Supported file types: All files
-                  </p>
-                </div>
-              )}
+              <p className="text-lg font-medium mb-1">Click to upload</p>
+              <p className="text-sm text-gray-500">or drag and drop</p>
+              <p className="text-xs text-gray-400 mt-2">SVG, PNG, JPG or GIF (max. 800x400px)</p>
             </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Message (Optional if file is provided)
+          {state.file && (
+            <div className="space-y-3 mb-4">
+              <div className="flex items-center p-3 bg-gray-50 rounded-lg">
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-sm font-medium">{state.file.name}</span>
+                    <span className="text-xs text-gray-500">
+                      {formatSize(state.file.size)}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full ${
+                        state.error ? 'bg-red-500' :
+                        state.success ? 'bg-green-500' : 'bg-blue-500'
+                      }`}
+                      style={{ width: state.uploading ? '50%' : state.success ? '100%' : '0%' }}
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={clearFileSelection}
+                  className="ml-3 text-gray-400 hover:text-gray-600"
+                >
+                  {state.success ? (
+                    <CheckIcon className="w-5 h-5 text-green-500" />
+                  ) : (
+                    <XMarkIcon className="w-5 h-5" />
+                  )}
+                </button>
+              </div>
+
+              {state.preview && (
+                <div className="mt-2">
+                  <img
+                    src={state.preview}
+                    alt="Preview"
+                    className="max-w-xs mx-auto rounded shadow-sm"
+                  />
+                </div>
+              )}
+              
+              {state.fileContent && (
+                <div className="mt-2">
+                  <div className="bg-gray-50 rounded-md p-4 text-left">
+                    <pre className="text-xs text-gray-700 whitespace-pre-wrap max-h-40 overflow-auto">
+                      {state.fileContent}
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Message
+              <span className="text-gray-400 text-xs ml-1">
+                {!state.file && "(Required)"}
+                {state.file && "(Optional)"}
+              </span>
             </label>
-            <textarea
-              value={state.message}
-              onChange={handleMessageChange}
-              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 ${
-                !state.message.trim() && !state.file && state.error
-                  ? 'border-red-300 focus:border-red-500'
-                  : 'border-gray-300 focus:border-blue-500'
-              }`}
-              rows={4}
-              placeholder="Enter your message here..."
-            />
-            <p className="mt-1 text-sm text-gray-500">
-              You can send either a file, a message, or both
+            <div className="relative">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-start pt-2">
+                <ChatBubbleBottomCenterTextIcon className="h-5 w-5 text-gray-400" />
+              </div>
+              <textarea
+                value={state.message}
+                onChange={handleMessageChange}
+                className={`block w-full rounded-lg pl-10 pr-3 py-2 ${
+                  state.error && !state.message.trim() && !state.file
+                    ? 'border-red-300 text-red-900 placeholder-red-300 focus:border-red-500 focus:ring-red-500'
+                    : 'border-gray-300 focus:border-blue-500 focus:ring-blue-500'
+                } shadow-sm`}
+                rows={4}
+                placeholder="Enter your message here..."
+              />
+            </div>
+            {state.error && !state.message.trim() && !state.file && (
+              <p className="mt-1 text-xs text-red-600">
+                Please enter a message or upload a file
+              </p>
+            )}
+          </div>
+
+          <div className="space-y-2">
+            <label className="block text-sm font-medium text-gray-700">
+              Recipient Email
+              <span className="text-gray-400 text-xs ml-1">(Optional)</span>
+            </label>
+            <div className="relative rounded-lg shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <EnvelopeIcon className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="email"
+                value={state.recipientEmail}
+                onChange={(e) => setState(prev => ({ ...prev, recipientEmail: e.target.value }))}
+                className="block w-full rounded-lg pl-10 pr-3 py-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                placeholder="Leave empty to send to your email"
+              />
+            </div>
+            <p className="text-xs text-gray-500">
+              If left empty, the file will be sent to your registered email
             </p>
           </div>
 
-          <div>
+          <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
-              Recipient Email (Optional)
+              Link Expiry
+              <span className="text-gray-400 text-xs ml-1">(Optional)</span>
             </label>
-            <input
-              type="email"
-              value={state.recipientEmail}
-              onChange={(e) => setState(prev => ({ ...prev, recipientEmail: e.target.value }))}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-              placeholder="Leave empty to send to your email"
-            />
-            <p className="mt-1 text-sm text-gray-500">Leave empty to send the file to your own email address</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700">
-              Link Expiry (Days) (Optional)
-            </label>
-            <input
-              type="number"
-              value={state.expiryDays}
-              onChange={(e) => setState(prev => ({ ...prev, expiryDays: parseInt(e.target.value) || 0 }))}
-              min="0"
-              max="30"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-            />
-            <p className="mt-1 text-sm text-gray-500">Set to 0 or leave empty for no expiry</p>
+            <div className="relative rounded-lg shadow-sm">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <CalendarIcon className="h-5 w-5 text-gray-400" />
+              </div>
+              <input
+                type="number"
+                value={state.expiryDays}
+                onChange={(e) => setState(prev => ({ ...prev, expiryDays: parseInt(e.target.value) || 0 }))}
+                min="0"
+                max="30"
+                className="block w-full rounded-lg pl-10 pr-3 py-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
+                placeholder="Number of days until link expires"
+              />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <span className="text-gray-500 sm:text-sm">days</span>
+              </div>
+            </div>
+            <p className="text-xs text-gray-500">
+              Link will expire after the specified number of days (max 30 days)
+            </p>
           </div>
 
           {state.error && (
-            <div className="text-red-500 text-sm bg-red-50 p-3 rounded">
-              {state.error}
+            <div className="flex items-center p-4 text-red-800 rounded-lg bg-red-50">
+              <div className="flex-shrink-0">
+                <XMarkIcon className="h-5 w-5" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">{state.error}</p>
+              </div>
             </div>
           )}
 
           {state.success && (
-            <div className="text-green-500 text-sm bg-green-50 p-3 rounded">
-              {state.file ? 'File uploaded successfully!' : 'Message sent successfully!'}
-              {state.recipientEmail ? ' An email will be sent to the recipient.' : ' An email will be sent to your address.'}
+            <div className="flex items-center p-4 text-green-800 rounded-lg bg-green-50">
+              <div className="flex-shrink-0">
+                <CheckIcon className="h-5 w-5" />
+              </div>
+              <div className="ml-3">
+                <p className="text-sm font-medium">
+                  {state.file ? 'File uploaded successfully!' : 'Message sent successfully!'}
+                  {state.recipientEmail 
+                    ? ' An email will be sent to the recipient.' 
+                    : ' An email will be sent to your address.'}
+                </p>
+              </div>
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={state.uploading || !canSubmit}
-            className="w-full py-2 px-4 border border-transparent rounded-md shadow-sm text-white bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 transition-colors"
-          >
-            {getButtonText()}
-          </button>
+          <div className="flex justify-end space-x-3 pt-4 border-t">
+            <button
+              type="button"
+              onClick={handleCancel}
+              className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={state.uploading || !canSubmit}
+              className={`inline-flex items-center px-4 py-2 text-white rounded-lg ${
+                state.uploading || !canSubmit
+                  ? 'bg-blue-300 cursor-not-allowed'
+                  : 'bg-blue-500 hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+              }`}
+            >
+              {state.uploading && (
+                <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                </svg>
+              )}
+              {getButtonText()}
+            </button>
+          </div>
         </div>
       </form>
     </div>
