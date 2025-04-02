@@ -1,3 +1,4 @@
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import { supabase } from './config/supabase';
@@ -32,15 +33,18 @@ function App() {
   }
 
   return (
-    <Router>
+    <Router basename="/file_transfer">
       <div className="min-h-screen bg-gray-100">
         {user && <Navbar user={user} />}
         <div className="container mx-auto px-4 py-8">
           <Routes>
-            <Route path="/login" element={!user ? <Login /> : <Navigate to="/" />} />
             <Route
               path="/"
               element={user ? <Dashboard /> : <Navigate to="/login" />}
+            />
+            <Route
+              path="/login"
+              element={!user ? <Login /> : <Navigate to="/" />}
             />
             <Route
               path="/upload"
