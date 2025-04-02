@@ -15,7 +15,8 @@ import {
   ClipboardDocumentIcon,
   XMarkIcon,
   DocumentTextIcon,
-  DocumentMagnifyingGlassIcon
+  DocumentMagnifyingGlassIcon,
+  ArrowDownTrayIcon
 } from '@heroicons/react/24/outline';
 import DeleteDialog from './DeleteDialog';
 
@@ -350,6 +351,48 @@ const Dashboard = () => {
     }
   };
 
+  const handleDownload = async (file: FileData) => {
+    try {
+      if (!file.path) {
+        setError('No file to download');
+        return;
+      }
+
+      const { data, error } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .download(file.path);
+
+      if (error) throw error;
+
+      // Create a download link
+      const url = window.URL.createObjectURL(data);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', file.name);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+
+      // Update download count
+      const { error: updateError } = await supabase
+        .from('files')
+        .update({ download_count: (file.download_count || 0) + 1 })
+        .eq('id', file.id);
+
+      if (updateError) console.error('Error updating download count:', updateError);
+
+      setSuccess('File downloaded successfully');
+      toggleDropdown(null);
+
+      // Refresh dashboard data to update stats
+      fetchDashboardData();
+    } catch (err) {
+      setError('Failed to download file');
+      console.error('Download error:', err);
+    }
+  };
+
   // Handle clicks outside of dropdowns
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -540,6 +583,16 @@ const Dashboard = () => {
                             >
                               <ClipboardDocumentIcon className="w-4 h-4 mr-2" />
                               Copy Message
+                            </button>
+                          )}
+
+                          {file.path && (
+                            <button
+                              onClick={() => handleDownload(file)}
+                              className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                            >
+                              <ArrowDownTrayIcon className="w-4 h-4 mr-2" />
+                              Download
                             </button>
                           )}
 

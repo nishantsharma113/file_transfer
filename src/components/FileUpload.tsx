@@ -37,6 +37,8 @@ const FileUpload = () => {
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+  const MAX_FILE_SIZE = 50 * 1024 * 1024; // 50MB in bytes
+
   const formatSize = (bytes: number): string => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -45,10 +47,26 @@ const FileUpload = () => {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
   };
 
+  const validateFile = (file: File): string | null => {
+    if (file.size > MAX_FILE_SIZE) {
+      return `File size exceeds 50MB limit (${formatSize(file.size)})`;
+    }
+    return null;
+  };
+
   const handleDrop = useCallback((e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault();
     const droppedFile = e.dataTransfer.files?.[0];
     if (droppedFile) {
+      const error = validateFile(droppedFile);
+      if (error) {
+        setState(prev => ({
+          ...prev,
+          error,
+          file: null
+        }));
+        return;
+      }
       setState(prev => ({
         ...prev,
         file: droppedFile,
@@ -61,6 +79,18 @@ const FileUpload = () => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (selectedFile) {
+      const error = validateFile(selectedFile);
+      if (error) {
+        setState(prev => ({
+          ...prev,
+          error,
+          file: null
+        }));
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+        return;
+      }
       setState(prev => ({
         ...prev,
         file: selectedFile,
@@ -300,7 +330,11 @@ const FileUpload = () => {
               />
               <p className="text-lg font-medium mb-1">Click to upload</p>
               <p className="text-sm text-gray-500">or drag and drop</p>
-              <p className="text-xs text-gray-400 mt-2">SVG, PNG, JPG or GIF (max. 800x400px)</p>
+              <p className="text-xs text-gray-400 mt-2">
+                SVG, PNG, JPG or GIF (max. 800x400px)
+                <br />
+                Maximum file size: 50MB
+              </p>
             </div>
           </div>
 
@@ -415,7 +449,7 @@ const FileUpload = () => {
           <div className="space-y-2">
             <label className="block text-sm font-medium text-gray-700">
               Link Expiry
-              <span className="text-gray-400 text-xs ml-1">(Optional)</span>
+              <span className="text-gray-400 text-xs ml-1">(In Days) Optional</span>
             </label>
             <div className="relative rounded-lg shadow-sm">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -430,9 +464,9 @@ const FileUpload = () => {
                 className="block w-full rounded-lg pl-10 pr-3 py-2 border-gray-300 focus:border-blue-500 focus:ring-blue-500"
                 placeholder="Number of days until link expires"
               />
-              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+              {/* <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
                 <span className="text-gray-500 sm:text-sm">days</span>
-              </div>
+              </div> */}
             </div>
             <p className="text-xs text-gray-500">
               Link will expire after the specified number of days (max 30 days)
