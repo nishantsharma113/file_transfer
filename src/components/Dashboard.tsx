@@ -26,10 +26,13 @@ interface FileData {
   size: number;
   path: string;
   created_at: string;
-  shared_with: string[];
   view_count: number;
   download_count: number;
   message?: string;
+  isShared?: boolean;
+  user_id: string;
+  recipient_email?: string;
+  isOwner: boolean;
 }
 
 interface DashboardStats {
@@ -124,10 +127,49 @@ const Dashboard = () => {
   };
 
   const formatDate = (date: string): string => {
-    return new Date(date).toLocaleDateString('en-US', {
+    const now = new Date();
+    const fileDate = new Date(date);
+    const diffInMinutes = Math.floor((now.getTime() - fileDate.getTime()) / (1000 * 60));
+    const diffInHours = Math.floor(diffInMinutes / 60);
+    const diffInDays = Math.floor(diffInHours / 24);
+
+    // If less than 1 hour ago, show minutes
+    if (diffInMinutes < 60) {
+      return `${diffInMinutes} ${diffInMinutes === 1 ? 'minute' : 'minutes'} ago`;
+    }
+    
+    // If less than 24 hours ago, show hours
+    if (diffInHours < 24) {
+      return `${diffInHours} ${diffInHours === 1 ? 'hour' : 'hours'} ago`;
+    }
+
+    // If yesterday, show "Yesterday" with time
+    if (diffInDays === 1) {
+      return `Yesterday at ${fileDate.toLocaleTimeString('en-US', { 
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true 
+      })}`;
+    }
+
+    // If within last 7 days, show day name and time
+    if (diffInDays < 7) {
+      return fileDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    }
+
+    // For older dates, show full date and time
+    return fileDate.toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
-      year: 'numeric'
+      year: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
     });
   };
 
@@ -158,14 +200,17 @@ const Dashboard = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Get files with their metadata
+      // Get both owned files and files shared with the user
       const { data: filesData, error: filesError } = await supabase
         .from('files')
         .select('*')
-        .eq('user_id', user.id)
+        .or(`user_id.eq.${user.id},recipient_email.eq.${user.email}`)
         .order('created_at', { ascending: false })
         .limit(6);
 
+
+
+        
       if (filesError) throw filesError;
 
       // Get storage size for each file
@@ -185,27 +230,32 @@ const Dashboard = () => {
           }
         }
 
+        // Add an isOwner flag to identify files uploaded by the current user
+        const isOwner = file.user_id === user.id;
+
         return {
           ...file,
           size,
-          shared_with: file.shared_with || []
+          isOwner
         };
       }));
 
       setFiles(filesWithMetadata);
 
-      // Calculate total stats
-      const totalStats = filesWithMetadata.reduce((acc, file) => ({
-        storageUsed: acc.storageUsed + (file.size || 0),
-        totalFiles: acc.totalFiles + 1,
-        totalViews: acc.totalViews + (file.view_count || 0),
-        totalDownloads: acc.totalDownloads + (file.download_count || 0)
-      }), {
-        storageUsed: 0,
-        totalFiles: 0,
-        totalViews: 0,
-        totalDownloads: 0
-      });
+      // Calculate total stats (only for owned files)
+      const totalStats = filesWithMetadata
+        .filter(file => file.isOwner)
+        .reduce((acc, file) => ({
+          storageUsed: acc.storageUsed + (file.size || 0),
+          totalFiles: acc.totalFiles + 1,
+          totalViews: acc.totalViews + (file.view_count || 0),
+          totalDownloads: acc.totalDownloads + (file.download_count || 0)
+        }), {
+          storageUsed: 0,
+          totalFiles: 0,
+          totalViews: 0,
+          totalDownloads: 0
+        });
 
       setStats(totalStats);
     } catch (error) {
@@ -547,7 +597,14 @@ const Dashboard = () => {
                   <td className="px-6 py-4">
                     <div className="flex items-center">
                       {getFileIcon(file.name)}
-                      <span className="ml-2 text-sm font-medium">{file.name}</span>
+                      <div className="ml-2">
+                        <span className="text-sm font-medium">{file.name}</span>
+                        {!file.isOwner && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800">
+                            Shared with you
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-500">{formatSize(file.size)}</td>
@@ -604,13 +661,15 @@ const Dashboard = () => {
                             Share Link
                           </button>
 
-                          <button
-                            onClick={() => handleDeleteClick(file)}
-                            className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
-                          >
-                            <TrashIcon className="w-4 h-4 mr-2" />
-                            Delete
-                          </button>
+                          {file.isOwner && (
+                            <button
+                              onClick={() => handleDeleteClick(file)}
+                              className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-gray-100"
+                            >
+                              <TrashIcon className="w-4 h-4 mr-2" />
+                              Delete
+                            </button>
+                          )}
                         </div>
                       </div>
                     )}

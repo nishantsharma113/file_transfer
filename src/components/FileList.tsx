@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { supabase, STORAGE_BUCKET } from '../config/supabase';
 import { format } from 'date-fns';
 import DeleteDialog from './DeleteDialog';
@@ -76,6 +76,7 @@ const FileList: React.FC = () => {
   const [expandedFile, setExpandedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState<string | null>(null);
   const [loadingContent, setLoadingContent] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     fetchFiles();
@@ -90,6 +91,18 @@ const FileList: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [deleteSuccess]);
+
+  // Add click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setActiveDropdown(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const fetchFiles = async () => {
     try {
@@ -537,7 +550,10 @@ const FileList: React.FC = () => {
                       </button>
                       
                       {activeDropdown === file.id && (
-                        <div className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+                        <div 
+                          ref={dropdownRef}
+                          className="absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10"
+                        >
                           <div className="py-1" role="menu">
                             <button
                               onClick={() => {
